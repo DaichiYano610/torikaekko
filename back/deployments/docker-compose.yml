@@ -1,0 +1,12 @@
+services:
+  app:
+    build:
+      context: ..      #dockerfileのディレクトリ
+      dockerfile: Dockerfile
+    container_name: go_app
+    volumes:
+      - ..:/usr/src/app # ホストのコードをコンテナにマウント（任意、開発用）
+    ports:
+      - "8080:8080"    # Goアプリが:8080でListenしている場合
+    #command: [""]   # CMD 上書き可能（Dockerfileにもあるが明示）
+    tty: true
