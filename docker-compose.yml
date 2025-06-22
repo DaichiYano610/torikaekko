@@ -1,16 +1,17 @@
-version: "3.8"
 services:
   node:
     build:
-      context: ./docker
+      context: ./front
       dockerfile: Dockerfile
     volumes:
-      - ./app/:/usr/src/app
+      - ./front:/usr/src/app
     tty: true
     stdin_open: true
     environment:
       - REACT_NATIVE_PACKAGER_HOSTNAME=192.168.0.238
     ports:
+
+      - "8081:8081"   
       - "19000:19000"
       - "19001:19001"
       - "19002:19002"

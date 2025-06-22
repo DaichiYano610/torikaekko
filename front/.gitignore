@@ -1,56 +1,79 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# Node modules
+# dependencies
 node_modules/
 
 # Expo
 .expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Expo
+.expo/
 .expo-shared/
+web-build/
+dist/
 
-# Android ビルドファイル
-android/app/build/
-android/.gradle/
-android/.idea/
-android/build/
-android/local.properties
-android/.cxx/
-android/.externalNativeBuild/
+# macOS
+.DS_Store
 
-# iOS ビルドファイル
-ios/Pods/
-ios/build/
-ios/DerivedData/
-ios/*.xcworkspace
-ios/*.xcuserdata/
+# Linux
+*.swp
 
-# Xcode 関連
-*.xcodeproj/*
-!*.xcodeproj/project.pbxproj
-*.xcuserstate
-*.xcuserdata/
+# TypeScript auto-generated
+*.tsbuildinfo
 
-# ログファイル
+# Log files
 *.log
 
-# テンポラリファイル
-*.tmp
-*.temp
-
-# Metroバンドラーのキャッシュ
-metro-cache/
-.expo-metro-cache/
-
-# Yarnのキャッシュ
-.yarn/cache/
-.yarn/unplugged/
-.yarn/build-state.yml
-.yarn/install-state.gz
-
-# その他
-*.swp
-*.DS_Store
-*.env
+# dotenv
+.env
 .env.*
 
-# バックアップファイル
-*.bak
-*.backup
+# VSCode
+.vscode/
+
+# IDEs
+.idea/
+*.iml
+
+# Metro bundler cache
+metro-cache/
+
+# Expo environment typings
+expo-env.d.ts
