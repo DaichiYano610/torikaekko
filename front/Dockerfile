@@ -17,8 +17,9 @@ COPY . .
 
 
 #for test code 
-CMD [ "bash" ]
+# CMD [ "bash" ]
 
 # Expoプロジェクトを起動
 # CMD ["yarn", "expo", "start", "--tunnel"]
+CMD [ "npx","expo","start" ]
 
