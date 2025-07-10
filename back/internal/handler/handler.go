@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"os"
 	"time"
 
 	"myapp/internal/middleware"
@@ -9,14 +10,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
-func RegisterUserRoutes(r *gin.Engine) {
-	r.POST("/login", login)
-	r.POST("/register_user", register_user)
+type Handler struct {
+	DB *gorm.DB
+}
+
+func RegisterUserRoutes(r *gin.Engine, db *gorm.DB) {
+	h := &Handler{DB: db}
+
+	r.POST("/login", h.login)
+	r.POST("/register_user", h.registerUser)
 
 	//認証必須のグループ
-	authorized_r := r.Group("/")
+	authorized_r := r.Group("/auth")
 	authorized_r.Use(middleware.AuthMiddleware())
 	{
 		authorized_r.GET("/hello", hello_world)
@@ -24,57 +33,88 @@ func RegisterUserRoutes(r *gin.Engine) {
 }
 
 func hello_world(c *gin.Context) {
-	tmp := []model.User{
-		{Username: "admin", Password: "admin"},
-		{Username: "admin", Password: "admin"},
-	}
-
-	c.IndentedJSON(http.StatusOK, tmp)
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Hello world"})
 }
 
-func login(c *gin.Context) {
+func (h *Handler) login(c *gin.Context) {
 	login_data := model.User{}
 
 	if err := c.ShouldBindJSON(&login_data); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invailed JSON format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
 		return
 	}
 
-	// 認証（今はハードコード、将来はDB）
-	if login_data.Username != "admin" || login_data.Password != "admin" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Username or Password error"})
+	// DBからユーザー取得
+	var db_user model.Users
+	if err := h.DB.Where("username = ?", login_data.Username).First(&db_user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Username or Password incorrect"})
 		return
 	}
 
-	// 有効期限付きJWTトークンを作成
+	// bcryptでパスワード照合
+	if err := bcrypt.CompareHashAndPassword(db_user.Password, []byte(login_data.Password)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Username or Password incorrect"})
+		return
+	}
+
+	// トークン作成
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user": login_data.Username,
+		"user": db_user.Username,
+		"iss":  os.Getenv("JWT_ISS"),
 		"iat":  time.Now().Unix(),
-		"exp":  time.Now().Add(24 * time.Hour).Unix(), // トークンは24時間で期限切れ
+		"exp":  time.Now().Add(24 * time.Hour).Unix(),
 		"nbf":  time.Now().Unix(),
 	})
 
-	secret := "admin" // 実際は .env 等に保管する
+	secret := os.Getenv("JWT_SECRET")
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "token creation failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "token creation failed"})
 		return
 	}
 
-	c.IndentedJSON(http.StatusOK, gin.H{"token": tokenString})
+	c.IndentedJSON(http.StatusOK, gin.H{
+		"token":   tokenString,
+		"message": "login successful",
+	})
 }
 
-func register_user(c *gin.Context) {
-	register_data := model.User{}
+func (h *Handler) registerUser(c *gin.Context) {
+	received_data := model.User{}
 
-	if err := c.ShouldBindJSON(&register_data); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invailed JSON format"})
+	if err := c.ShouldBindJSON(&received_data); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
 		return
 	}
 
-	//DBに同じユーザ情報があるか確認
-	//あった場合、登録なし
-	//ない場合、登録
+	// 同一ユーザー名が存在するか確認
+	var existing model.User
+	if err := h.DB.Where("username = ?", received_data.Username).First(&existing).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "user already exists"})
+		return
+	}
 
-	c.JSON(http.StatusOK, gin.H{"register": register_data})
+	// パスワードのハッシュ化
+	hash, err := bcrypt.GenerateFromPassword([]byte(received_data.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "process error"})
+		return
+	}
+
+	register_data := model.Users{
+		Username: received_data.Username,
+		Password: hash,
+	}
+
+	// 新規ユーザーを保存
+	if err := h.DB.Create(&register_data).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register user"})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{
+		"message":  "User registration successful.",
+		"username": gin.H{"username": received_data.Username},
+	})
 }
