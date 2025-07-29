@@ -37,84 +37,91 @@ func hello_world(c *gin.Context) {
 }
 
 func (h *Handler) login(c *gin.Context) {
-	login_data := model.User{}
+	var loginData struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
 
-	if err := c.ShouldBindJSON(&login_data); err != nil {
+	if err := c.ShouldBindJSON(&loginData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
 		return
 	}
 
-	// DBからユーザー取得
-	var db_user model.Users
-	if err := h.DB.Where("username = ?", login_data.Username).First(&db_user).Error; err != nil {
+	var user model.User
+	if err := h.DB.Where("username = ?", loginData.Username).First(&user).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Username or Password incorrect"})
 		return
 	}
 
-	// bcryptでパスワード照合
-	if err := bcrypt.CompareHashAndPassword(db_user.Password, []byte(login_data.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginData.Password)); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Username or Password incorrect"})
 		return
 	}
 
-	// トークン作成
+	// トークン生成
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user": db_user.Username,
-		"iss":  os.Getenv("JWT_ISS"),
-		"iat":  time.Now().Unix(),
-		"exp":  time.Now().Add(24 * time.Hour).Unix(),
-		"nbf":  time.Now().Unix(),
+		"user":    user.Username,
+		"user_id": user.ID,
+		"iss":     os.Getenv("JWT_ISS"),
+		"iat":     time.Now().Unix(),
+		"exp":     time.Now().Add(24 * time.Hour).Unix(),
+		"nbf":     time.Now().Unix(),
 	})
 
 	secret := os.Getenv("JWT_SECRET")
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "token creation failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "token creation failed"})
 		return
 	}
 
-	c.IndentedJSON(http.StatusOK, gin.H{
-		"token":   tokenString,
+	c.JSON(http.StatusOK, gin.H{
 		"message": "login successful",
+		"data": gin.H{
+			"token": tokenString,
+			"user":  user.Username,
+		},
 	})
 }
 
 func (h *Handler) registerUser(c *gin.Context) {
-	received_data := model.User{}
+	var input model.User
 
-	if err := c.ShouldBindJSON(&received_data); err != nil {
+	// JSONデータをバインド
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
 		return
 	}
 
-	// 同一ユーザー名が存在するか確認
+	// ユーザー名の重複チェック
 	var existing model.User
-	if err := h.DB.Where("username = ?", received_data.Username).First(&existing).Error; err == nil {
+	if err := h.DB.Where("username = ?", input.Username).First(&existing).Error; err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "user already exists"})
 		return
 	}
 
 	// パスワードのハッシュ化
-	hash, err := bcrypt.GenerateFromPassword([]byte(received_data.Password), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "process error"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "password hash error"})
 		return
 	}
 
-	register_data := model.Users{
-		Username: received_data.Username,
-		Password: hash,
+	// 登録用データ作成
+	newUser := model.User{
+		Username: input.Username,
+		Password: string(hashedPassword), // stringにして保存もOK
 	}
 
-	// 新規ユーザーを保存
-	if err := h.DB.Create(&register_data).Error; err != nil {
+	// DBに保存
+	if err := h.DB.Create(&newUser).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register user"})
 		return
 	}
 
-	c.IndentedJSON(http.StatusOK, gin.H{
+	// 成功レスポンス
+	c.JSON(http.StatusOK, gin.H{
 		"message":  "User registration successful.",
-		"username": gin.H{"username": received_data.Username},
+		"username": newUser.Username,
 	})
 }

@@ -29,28 +29,39 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// トークンの検証（署名 & 有効期限 & 発行時間）
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// 署名アルゴリズムのチェック
+			// 署名アルゴリズムチェック
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 			return []byte(secret), nil
 		}, jwt.WithLeeway(5*time.Second), jwt.WithValidMethods([]string{"HS256"}))
 
-		// 無効・期限切れ・不正トークンなら拒否
-		if err != nil {
+		if err != nil || !token.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("Token invalid: %v", err)})
 			c.Abort()
 			return
 		}
 
-		if !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token is not valid"})
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
 			c.Abort()
 			return
 		}
 
+		// "sub" クレームから userID を取得（float64なので変換）
+		userIDFloat, ok := claims["sub"].(float64)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "userID not found in token"})
+			c.Abort()
+			return
+		}
+
+		userID := uint(userIDFloat)
+
+		// contextにuserIDをセットして後続処理へ
+		c.Set("userID", userID)
 		c.Next()
 	}
 }

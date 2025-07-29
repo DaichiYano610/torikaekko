@@ -1,11 +1,7 @@
 package model
 
 type User struct {
-	Username string
-	Password string
-}
-
-type Users struct {
-	Username string `gorm:"primaryKey"`
-	Password []byte `gorm:"not null"` // パスワードのハッシュ（bcryptなど）
+	ID       uint   `gorm:"primaryKey" json:"-"`
+	Username string `gorm:"unique;not null" json:"username"`
+	Password string `gorm:"not null" json:"password"` // JSONでは文字列、DBではハッシュ保存
 }
