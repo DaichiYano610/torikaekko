@@ -19,7 +19,8 @@ export default function Login() {
         onChangeText={setUsername}
         autoCapitalize="none"
       />
-      <Input
+
+	<Input
         label="パスワード"
         placeholder="パスワードを入力"
         value={password}
@@ -27,10 +28,10 @@ export default function Login() {
         secureTextEntry
         autoCapitalize="none"
       />
+      <View style={{ marginTop: 20 }} />
       <Button title="ログイン" onPress={onSubmit} />
     </View>
   );
 }
-
 
 
