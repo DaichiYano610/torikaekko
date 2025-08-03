@@ -11,3 +11,14 @@ CREATE TABLE users (
   password BYTEA NOT NULL
 );
 ```
+
+## あげるものデータ
+```sql
+CREATE TABLE items (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    want TEXT NOT NULL,
+    image_paths TEXT[] NOT NULL, -- 複数の画像パス(カンマ区切り)
+    user_id INTEGER NOT NULL REFERENCES users(id)
+);
+```
